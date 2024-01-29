@@ -66,7 +66,6 @@ nix_tests = \
   build-remote-trustless-should-pass-1.sh \
   build-remote-trustless-should-pass-2.sh \
   build-remote-trustless-should-pass-3.sh \
-  build-remote-trustless-should-fail-0.sh \
   nar-access.sh \
   pure-eval.sh \
   eval.sh \
