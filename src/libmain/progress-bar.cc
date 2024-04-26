@@ -84,12 +84,14 @@ private:
 
     bool printBuildLogs = false;
     bool isTTY;
+    std::string logPrefixAnsi;
 
 public:
 
     ProgressBar(bool tty)
     {
         isTTY = tty || getEnv("NIX_FORCE_COLOR").has_value();
+        logPrefixAnsi = getEnv("NIX_LOG_PREFIX_ANSI").value_or(ANSI_FAINT);
         state_.lock()->active = tty;
         updateThread = std::thread([&]() {
             auto state(state_.lock());
@@ -290,7 +292,7 @@ public:
                     if (type == resPostBuildLogLine) {
                         suffix = " (post)> ";
                     }
-                    log(*state, lvlInfo, ANSI_FAINT + info.name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
+                    log(*state, lvlInfo, logPrefixAnsi + info.name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
                 } else {
                     state->activities.erase(i->second);
                     info.lastLine = lastLine;
