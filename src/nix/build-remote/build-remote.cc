@@ -1,3 +1,4 @@
+#include <string>
 #include <fstream>
 #include <cstdlib>
 #include <cstring>
@@ -91,6 +92,28 @@ int countActiveUsers(int maxBuildJobs) {
     return count;
 }
 
+std::string getRealSystem() {
+#if defined(__x86_64__)
+    const char* arch = "x86_64";
+#elif defined(__aarch64__)
+    const char* arch = "aarch64";
+#elif defined(__i386__)
+    const char* arch = "i386";
+#else
+    const char* arch = "unknown";
+#endif
+
+#if defined(__APPLE__) && defined(__MACH__)
+    const char* os = "darwin";
+#elif defined(__linux__)
+    const char* os = "linux";
+#else
+    const char* os = "unknown";
+#endif
+
+    return std::string(arch) + "-" + os;
+}
+
 static int main_build_remote(int argc, char ** argv)
 {
     {
@@ -115,6 +138,7 @@ static int main_build_remote(int argc, char ** argv)
             auto name = readString(source);
             auto value = readString(source);
             settings.set(name, value);
+            debug("parent setting: %s = %s", name, value);
         }
 
         auto maxBuildJobs = settings.maxBuildJobs;
@@ -141,13 +165,14 @@ static int main_build_remote(int argc, char ** argv)
         debug("maxBuildJobs %d", maxBuildJobs);
         debug("thisSystem %s", settings.thisSystem);
         debug("systemFeatures %s", *store->config.systemFeatures.get().begin());
+        debug("realSystem %s", getRealSystem());
 
         // placeholder local machine
         machines.push_back(Machine(
             // `storeUri`
             "auto",
             // `systemTypes`
-            {settings.thisSystem},
+            {getRealSystem()},
             // `sshKey`
             "",
             // `maxJobs`
