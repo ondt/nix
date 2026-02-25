@@ -3,6 +3,7 @@
 #include "nix/util/sync.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/names.hh"
+#include "nix/util/environment-variables.hh"
 
 #include <atomic>
 #include <map>
@@ -96,10 +97,10 @@ private:
 
 public:
 
-    ProgressBar(bool isTTY)
-        : isTTY(isTTY)
+    ProgressBar(bool tty)
     {
-        state_.lock()->active = isTTY;
+        isTTY = tty || getEnv("NIX_FORCE_COLOR").has_value();
+        state_.lock()->active = tty;
         updateThread = std::thread([&]() {
             auto state(state_.lock());
             auto nextWakeup = std::chrono::milliseconds::max();
@@ -188,7 +189,7 @@ public:
 
     void log(State & state, Verbosity lvl, std::string_view s)
     {
-        if (state.active) {
+        if (isTTY) {
             writeToStderr("\r\e[K" + filterANSIEscapes(s, !isTTY) + ANSI_NORMAL "\n");
             draw(state);
         } else {
