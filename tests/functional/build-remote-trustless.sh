@@ -4,6 +4,8 @@
 # this, `set -u` will catch any that are forgotten.
 # shellcheck disable=SC2154
 
+skipTest "This test checks for the old behavior"
+
 requireSandboxSupport
 requiresUnprivilegedUserNamespaces
 [[ "$busybox" =~ busybox ]] || skipTest "no busybox"

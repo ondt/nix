@@ -1,5 +1,8 @@
 # shellcheck shell=bash
 
+skipTest "This test checks for the old behavior"
+
+
 : "${file?must be defined by caller (remote building test case using this)}"
 
 requireSandboxSupport

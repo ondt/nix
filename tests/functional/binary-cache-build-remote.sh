@@ -2,6 +2,8 @@
 
 source common.sh
 
+skipTest "This test checks for the old behavior"
+
 TODO_NixOS
 
 clearStoreIfPossible

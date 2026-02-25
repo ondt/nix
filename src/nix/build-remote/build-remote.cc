@@ -1,3 +1,4 @@
+#include <fstream>
 #include <cstdlib>
 #include <cstring>
 #include <algorithm>
@@ -50,6 +51,46 @@ static bool allSupportedLocally(Store & store, const StringSet & requiredFeature
     return true;
 }
 
+int countActiveUsers(int maxBuildJobs) {
+    std::unordered_set<int> activeUids;
+
+    for (const auto& entry : std::filesystem::directory_iterator("/proc")) {
+        try {
+            if (entry.is_directory()) {
+                std::string pid = entry.path().filename().string();
+                if (std::all_of(pid.begin(), pid.end(), ::isdigit)) {
+                    std::string statusFile = entry.path() / "status";
+                    std::ifstream file(statusFile);
+                    if (file.is_open()) {
+                        std::string line;
+                        while (std::getline(file, line)) {
+                            if (line.rfind("Uid:", 0) == 0) {
+                                std::string userIdText = line.substr(5, line.find('\t', 5) - 5);
+                                // debug("stoi: '%s'", userIdText);
+                                int userId = std::stoi(userIdText);
+                                activeUids.insert(userId);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (std::exception & e) {
+            printError("error!!!: %s", e.what());
+            continue;
+        }
+    }
+
+    int count = 0;
+    for (int uid = 30000; uid < 30000 + maxBuildJobs; ++uid) {
+        if (activeUids.count(uid) > 0) {
+            count++;
+        }
+    }
+
+    return count;
+}
+
 static int main_build_remote(int argc, char ** argv)
 {
     {
@@ -97,6 +138,30 @@ static int main_build_remote(int argc, char ** argv)
         auto machines = getMachines();
         debug("got %d remote builders", machines.size());
 
+        debug("maxBuildJobs %d", maxBuildJobs);
+        debug("thisSystem %s", settings.thisSystem);
+        debug("systemFeatures %s", *store->config.systemFeatures.get().begin());
+
+        // placeholder local machine
+        machines.push_back(Machine(
+            // `storeUri`
+            "auto",
+            // `systemTypes`
+            {settings.thisSystem},
+            // `sshKey`
+            "",
+            // `maxJobs`
+            maxBuildJobs,
+            // `speedFactor`
+            1,
+            // `supportedFeatures`
+            store->config.systemFeatures.get(),
+            // `mandatoryFeatures`
+            {},
+            // `sshPublicHostKey`
+            ""
+        ));
+
         if (machines.empty()) {
             std::cerr << "# decline-permanently\n";
             return 0;
@@ -141,7 +206,7 @@ static int main_build_remote(int argc, char ** argv)
 
                 Machine * bestMachine = nullptr;
                 uint64_t bestLoad = 0;
-                for (auto & m : machines) {
+                for (auto & m : std::ranges::views::reverse(machines)) {
                     debug("considering building on remote machine '%s'", m.storeUri.render());
 
                     if (m.enabled && m.systemSupported(neededSystem) && m.allSupported(requiredFeatures)
@@ -162,6 +227,10 @@ static int main_build_remote(int argc, char ** argv)
                         if (!free) {
                             continue;
                         }
+                        if (m.storeUri.render() == "auto") {
+                            load = countActiveUsers(maxBuildJobs);
+                        }
+                        debug("load of '%s' is %d", m.storeUri.render(), load);
                         bool best = false;
                         if (!bestSlotLock) {
                             best = true;
@@ -182,6 +251,17 @@ static int main_build_remote(int argc, char ** argv)
                             bestMachine = &m;
                         }
                     }
+                }
+
+                debug("best machine is '%s'", bestMachine->storeUri.render());
+
+                if (bestMachine->storeUri.render() == "auto") {
+                    debug("declining remote build, local machine is better");
+                    // reset the state as if the placeholder machine was never there
+                    bestMachine = nullptr;
+                    bestLoad = 0;
+                    rightType = false;
+                    bestSlotLock = -1;
                 }
 
                 if (!bestSlotLock) {
