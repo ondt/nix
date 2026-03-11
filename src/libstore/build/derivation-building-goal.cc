@@ -555,8 +555,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     /* Don't do a remote build if the derivation has the attribute
        `preferLocalBuild' set.  Also, check and repair modes are only
        supported for local builds. */
-    bool buildLocally =
-        (buildMode != bmNormal || drvOptions->willBuildLocally(worker.store, *drv)) && settings.maxBuildJobs.get() != 0;
+    bool buildLocally = buildMode != bmNormal || drvOptions->willBuildLocally(worker.store, *drv);
 
     if (!buildLocally) {
         switch (tryBuildHook()) {
@@ -610,7 +609,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         assert(!hook);
 
         unsigned int curBuilds = worker.getNrLocalBuilds();
-        if (curBuilds >= settings.maxBuildJobs) {
+        if (curBuilds >= settings.maxBuildJobs && !(buildLocally && curBuilds == 0)) {
             outputLocks.unlock();
             co_await waitForBuildSlot();
             co_return tryToBuild();
